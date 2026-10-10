@@ -47,7 +47,10 @@ height fraction `eta_h = (eta / C_L) / (eta / C_L + (1 - eta) / C_G)`
 (`C_G = 1.0645`, `C_L = pi/2`, the areas per unit FWHM of unit-height
 components). It agrees with the Voigt profile within about 1 % of the peak
 height, and fitting it to a Voigt profile returns `Gamma_L` and `Gamma_G`
-within 1 % (both checked against `scipy.special.voigt_profile` in the tests).
+within 1 % when `Gamma_G / Gamma_L` is above about 0.3 (both checked against
+`scipy.special.voigt_profile` in the tests); a small Gaussian width under a
+dominant Lorentzian is poorly determined (at `Gamma_G / Gamma_L = 1/30` the
+fitted `Gamma_G` is 14 % low), a limit of the approximation itself.
 `Gamma_G -> 0` gives a Lorentzian, `Gamma_L -> 0` a Gaussian. The stored
 `eta` of a TCH peak is the area fraction `eta`.
 

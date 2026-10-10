@@ -103,7 +103,9 @@ band from being flagged (its flanks are themselves large jumps).
 | `protect` | axis ranges never modified | `()` |
 
 Pitfalls: a spike wider than `max_width`, a spike on the steep flank of a
-sharp band and a spike on the first or last sample are not detected; a low
+sharp band and a spike on the first or last sample are not detected; a spike
+followed within `max_width` samples by a real step larger than the
+threshold is flagged together with the clean sample before the step; a low
 threshold (3.5) flags noise in spectra with heavy-tailed noise; integer data
 with many zero differences have `MAD = 0`, which raises (smooth or bin first).
 
@@ -123,7 +125,9 @@ the replacement is pulled towards it; the tops of bands narrower than about
 consecutive differences with `|d| > sf_threshold` (data units), the samples
 between the first and the last jump are replaced by the straight line between
 the samples on either side. Simple and fast, but the threshold is
-absolute (it depends on the intensity scale) and steep band flanks exceed it.
+absolute (it depends on the intensity scale), steep band flanks exceed it,
+and a spike with a flat top of two or more samples is not removed (its two
+edges are separate runs, each treated as a step).
 
 ## smooth / smooth2nd
 

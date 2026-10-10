@@ -5,8 +5,7 @@ measured data and how analyses are put together from them. Each script is
 configured by the `AppConfig` dataclass at its top (and module-level peak or
 pipeline definitions); run it from any directory, outputs go to
 `example_output/` there. Set `device="cuda:0"` in the fitting examples to
-use a GPU. The numbers below are from CPU runs; GPU runs agree to the
-float32 tolerance.
+use a GPU. The numbers below are from CPU runs.
 
 | script | shows | data |
 |---|---|---|
@@ -64,7 +63,7 @@ Parameter maps written by `save_fit_outputs` (summary/parameter_maps.png):
 
 The script prints the errors against the truth: median absolute position
 errors 0.018, 0.022 and 0.118 cm^-1 and median height errors 0.6 %, 0.7 % and
-1.7 % for the three bands (900 spectra in 169 s on 4 CPU threads). The
+1.7 % for the three bands (900 spectra in 173 s on 4 CPU threads). The
 weak, broad band is the least constrained, as expected at its signal level.
 
 ## 04: choosing between peak models per pixel
@@ -136,8 +135,8 @@ wrinkle stripes.
 
 ![MoS2 PL](figures/examples/mos2_pl.png)
 
-PL results: the BIC chooses all three bands in 95.6 % of the fitted pixels
-(A0 + B 3.4 %, A0 + A- 1.0 %). The peak energy and FWHM of the total fitted
+PL results: the BIC chooses all three bands in 95.7 % of the fitted pixels
+(A0 + B 3.3 %, A0 + A- 1.0 %). The peak energy and FWHM of the total fitted
 band, which do not depend on how the band is decomposed (found on a 0.2 meV
 grid), have medians of 1.860 eV and 124 meV. Following common practice for
 room-temperature monolayer MoS2, the low-energy component is assigned to the
@@ -149,6 +148,6 @@ A-/(A0 + A-) where A- is selected is 0.54.
 The two maps are shown in their own stage coordinates: the PL export's
 coordinates are offset from the Raman export's by about (-0.4, -5.9) um,
 so register the images (for example by cross-correlating intensity maps)
-before combining Raman and PL values pixel by pixel. Run time on 12 CPU
-threads: about 5 minutes for the Raman map and 14 minutes for the three PL
-variants; a GPU shortens both.
+before combining Raman and PL values pixel by pixel. Run time on 8 CPU
+threads: about 4 minutes for the Raman map and 15 minutes for the three PL
+variants (set `device="cuda:0"` to run the batches on a GPU).
