@@ -54,6 +54,14 @@ def test_batch_size_does_not_change_the_fit():
     np.testing.assert_allclose(batch.results()["pos"][0], single.results()["pos"][0], atol=2e-4)
 
 
+def test_several_cpu_workers_give_the_same_result():
+    sm = two_peak_map(shape=(3, 4))
+    cfg = FitConfig((peak("lorentzian", 384, 5, 0.9), peak("gaussian", 404, 5, 0.5)), FAST)
+    one = fit_map(sm.ssm, cfg, MapFitOptions(batch_size=5)).result
+    two = fit_map(sm.ssm, cfg, MapFitOptions(batch_size=5, devices=("cpu", "cpu"))).result   # two worker threads
+    np.testing.assert_array_equal(one.pos, two.pos)
+
+
 # ------------------------------------------------------------------ map fit
 def test_fit_map_recovers_truth_and_roundtrips(tmp_path):
     sm = two_peak_map()
