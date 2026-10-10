@@ -9,7 +9,7 @@ the axis unit; pass it as `unit`.
 |---|---|---|
 | `read_horiba_txt(path, unit="cm^-1")` | HORIBA LabSpec map export | first row: the `M` axis values (after two empty cells); every other row: `x  y  I_1 ... I_M`; tabs, spaces, commas or semicolons; `#` and `//` lines skipped |
 | `write_horiba_txt(ssm, path, frame_order="x_fast")` | the same layout, rows in raster order | needs a complete raster |
-| `read_nanobase_csv(path, unit, x_column="X", y_column="Y", swap_xy=False, negate_x=False, negate_y=False)` | Nanobase mapping CSV | metadata lines, an `AXISDATA=` marker, a header `X, Y, Z, XINDEX, YINDEX, ZINDEX, <axis...>`, one spectrum per row |
+| `read_nanobase_csv(path, unit, x_column="X", y_column="Y", swap_xy=True, negate_x=True, negate_y=False)` | Nanobase mapping CSV | metadata lines, an `AXISDATA=` marker, a header `X, Y, Z, XINDEX, YINDEX, ZINDEX, <axis...>`, one spectrum per row |
 | `read_ntmdt_txt(path, unit="nm", axis_atol=1e-6)` | NT-MDT export | every row `x, y, a_0, I_0, a_1, I_1, ...`; the axis repeated per row must agree within `axis_atol` |
 | `read_andor_sif(path, x_coords, y_coords, frame_order="x_fast", unit="nm")` | Andor Solis `.sif` kinetic series of full-vertical-binning frames | needs the optional package `sif_parser`; the wavelength calibration comes from the file |
 
@@ -23,10 +23,12 @@ xs, ys = symmetric_raster(12.0, 12.0, 120, 120)          # linspace(-12, 12, 120
 sif = read_andor_sif("scan.sif", xs, ys, frame_order="x_fast")
 ```
 
-**Coordinates.** Readers keep the coordinates as exported. Nanobase exports
-of some setups need a swap and/or a sign change to look right
-(`swap_xy`, `negate_x`, `negate_y`; the original converter applied
-`swap_xy=True, negate_x=True`). SIF files carry no coordinates: frame `k` is
+**Coordinates.** Readers keep the coordinates as exported, except the
+Nanobase reader, which by default applies the orientation of the original
+converter: x and y swapped, then x negated (`swap_xy=True, negate_x=True`),
+so that images of the instrument it was written for appear the right way
+round. Pass `swap_xy=False, negate_x=False` to get the stored coordinates.
+SIF files carry no coordinates: frame `k` is
 placed at `(x[k % nx], y[k // nx])` for `frame_order="x_fast"` (x changes
 fastest, i.e. y-major scanning) or `(x[k // ny], y[k % ny])` for `"y_fast"`
 (`frames_to_xy`); pass a reversed coordinate array for a scan that runs

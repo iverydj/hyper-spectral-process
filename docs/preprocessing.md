@@ -83,34 +83,46 @@ D. A. Whitaker and K. Hayes, Chemometr. Intell. Lab. Syst. 179, 82 (2018)).
 
 1. First differences `d_k = y[k+1] - y[k]` of every spectrum are scored with
    the modified z-score `z = 0.6745 (d - median(d)) / MAD(d)` (panel b).
-2. A spike is a jump `|z_i| > threshold` followed within `max_width` samples
-   by a jump of the opposite sign `|z_j| > threshold`, with ordinary
-   differences (`|z| <= threshold`) just outside the pair (the farthest such
-   `j` is taken). The samples between the two jumps are flagged (panel a).
-   Both upward and downward spikes are detected.
+2. Detection, two rules:
+   - **published rule** (`wh_max_width=None`; the algorithm of Whitaker and
+     Hayes and of the original code): sample `k` is flagged for every
+     difference with `|z_k| > threshold`.
+   - **pair rule** (default, `wh_max_width=2`): a spike is a jump
+     `|z_i| > threshold` followed within `max_width` samples by a jump of the
+     opposite sign `|z_j| > threshold`, with ordinary differences
+     (`|z| <= threshold`) just outside the pair (the farthest such `j` is
+     taken); the samples between the two jumps are flagged. Both upward and
+     downward spikes are detected.
 3. Every flagged sample is replaced by the mean of the unflagged samples
    within `+/- m` samples (panel c).
 
-The pair condition keeps band flanks from being flagged (a flank is a run of
-same-sign jumps); the isolation condition keeps the top of a sharp, strong
-band from being flagged (its flanks are themselves large jumps).
+The published rule flags every large difference, so a band that is sampled
+by only a few points has large differences on its flanks and around its top
+and is flagged there too; its top is then replaced by the mean of its
+neighbours, i.e. clipped (panel a, orange circles, at the original default
+threshold 3.5). The pair rule keeps band flanks (a flank is a run of
+same-sign jumps) and the top of a sharp, strong band (its flanks are
+themselves large jumps) from being flagged. Use the published rule to
+reproduce results of the original code or when the bands are broad compared
+with the sampling step.
 
 | parameter | meaning | pipeline default |
 |---|---|---|
 | `wh_threshold` | z-score above which a jump counts | 3.5 (function default 7.0) |
 | `wh_m` | half-width of the replacement neighbourhood | 8 (function default 3) |
-| `wh_max_width` | widest spike detected, samples | 2 |
+| `wh_max_width` | widest spike detected by the pair rule, samples; `None` = published rule | 2 |
 | `protect` | axis ranges never modified | `()` |
 
-Pitfalls: a spike wider than `max_width`, a spike on the steep flank of a
-sharp band and a spike on the first or last sample are not detected; a spike
+Pitfalls of the pair rule: a spike wider than `max_width`, a spike on the
+steep flank of a sharp band and a spike on the first or last sample are not
+detected; a spike
 followed within `max_width` samples by a real step larger than the
 threshold is flagged together with the clean sample before the step; a low
 threshold (3.5) flags noise in spectra with heavy-tailed noise; integer data
 with many zero differences have `MAD = 0`, which raises (smooth or bin first).
 
 **`"wh2"`: two passes** (`despike_two_pass`). Pass 1 is Whitaker-Hayes
-(`wh1_threshold`, `wh1_m`); pass 2 (`despike_residual`) smooths every
+(`wh1_threshold`, `wh1_m`, `wh1_max_width`); pass 2 (`despike_residual`) smooths every
 spectrum with a Savitzky-Golay filter (`resid_ref_window`,
 `resid_ref_polyorder`), scores the residual `y - reference` with the modified
 z-score and replaces samples with `|z| > resid_threshold` by the reference

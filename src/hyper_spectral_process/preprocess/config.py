@@ -34,9 +34,10 @@ class DespikeParams:
     sf_threshold: float = 40.0          # simple: jump threshold in data units
     wh_threshold: float = 3.5           # wh: modified z-score threshold
     wh_m: int = 8                       # wh: neighbour half-width for the replacement
-    wh_max_width: int = 2               # wh/wh2: widest detected spike (samples)
+    wh_max_width: Optional[int] = 2     # wh: widest spike of the pair rule; None = published rule
     wh1_threshold: float = 3.5          # wh2 pass 1
     wh1_m: int = 8
+    wh1_max_width: Optional[int] = 2    # wh2 pass 1: as wh_max_width
     resid_ref_window: int = 7           # wh2 pass 2: Savitzky-Golay reference
     resid_ref_polyorder: int = 3
     resid_threshold: float = 5.0

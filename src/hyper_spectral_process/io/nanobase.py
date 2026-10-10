@@ -17,7 +17,7 @@ _INDEX_COLUMNS = ("Z", "XINDEX", "YINDEX", "ZINDEX")
 
 
 def read_nanobase_csv(path: str | Path, unit: str = "cm^-1", *, x_column: str = "X", y_column: str = "Y",
-                      swap_xy: bool = False, negate_x: bool = False, negate_y: bool = False) -> StandardSpectrumMap:
+                      swap_xy: bool = True, negate_x: bool = True, negate_y: bool = False) -> StandardSpectrumMap:
     """Read a Nanobase mapping CSV.
 
     Parameters
@@ -26,10 +26,10 @@ def read_nanobase_csv(path: str | Path, unit: str = "cm^-1", *, x_column: str = 
     unit : axis unit stored in the returned map.
     x_column, y_column : header names of the stage coordinates.
     swap_xy, negate_x, negate_y : orientation corrections applied to the
-        coordinates after reading (swap first, then negate). The default
-        returns the coordinates exactly as stored. The original converter
-        applied ``swap_xy=True, negate_x=True`` for the instrument it was
-        written for.
+        coordinates after reading (swap first, then negate). The defaults
+        (``swap_xy=True, negate_x=True``) are those of the original converter,
+        which makes images of its instrument appear in the right orientation;
+        ``swap_xy=False, negate_x=False`` returns the coordinates as stored.
 
     Columns whose header parses as a number form the spectral axis. Every
     cell must be numeric; empty cells raise ``ValueError``.

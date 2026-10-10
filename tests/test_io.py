@@ -73,11 +73,11 @@ def test_nanobase_csv(tmp_path):
     text = ("FILETYPE=RAMAN SPECTRUM (MAPPING)\nAXISDATA=\nX,Y,Z,XINDEX,YINDEX,ZINDEX,300.0,301.0,302.0\n"
             "-1,2,0,0,0,0,5,6,7\n1,2,0,1,0,0,8,9,10\n")
     (tmp_path / "n.csv").write_text(text)
-    m = read_nanobase_csv(tmp_path / "n.csv")
+    m = read_nanobase_csv(tmp_path / "n.csv")              # default: the original orientation (swap, negate x)
     np.testing.assert_array_equal(m.axis, [300, 301, 302])
-    np.testing.assert_array_equal(m.xy, [[-1, 2], [1, 2]])
-    m2 = read_nanobase_csv(tmp_path / "n.csv", swap_xy=True, negate_x=True)
-    np.testing.assert_array_equal(m2.xy, [[-2, -1], [-2, 1]])
+    np.testing.assert_array_equal(m.xy, [[-2, -1], [-2, 1]])
+    raw = read_nanobase_csv(tmp_path / "n.csv", swap_xy=False, negate_x=False)
+    np.testing.assert_array_equal(raw.xy, [[-1, 2], [1, 2]])
 
 
 def test_ntmdt(tmp_path):

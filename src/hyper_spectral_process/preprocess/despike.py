@@ -7,14 +7,16 @@ Three methods (pipeline ``despike.mode``):
 * ``"wh"`` (:func:`despike_whitaker_hayes`): Whitaker-Hayes detection on the
   modified z-score of the first difference (Whitaker & Hayes, Chemometr.
   Intell. Lab. Syst. 179, 82 (2018)); flagged samples are replaced by the
-  mean of their unflagged neighbours.
+  mean of their unflagged neighbours. By default a spike must be an isolated
+  pair of opposite jumps (``max_width``); ``max_width=None`` uses the
+  published rule (every large difference).
 * ``"wh2"`` (:func:`despike_two_pass`): ``"wh"`` followed by a residual
   z-score pass against a Savitzky-Golay reference (:func:`despike_residual`),
   which catches remnants of wide spikes.
 """
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Optional, Sequence
 
 import numpy as np
 from scipy.signal import savgol_filter
@@ -55,11 +57,19 @@ def despike_simple(ssm: StandardSpectrumMap, threshold: float) -> StandardSpectr
 
 
 # ---------------------------------------------------------- Whitaker-Hayes
-def whitaker_hayes_mask(spectra: np.ndarray, threshold: float = 7.0, max_width: int = 2) -> np.ndarray:
+def whitaker_hayes_mask(spectra: np.ndarray, threshold: float = 7.0, max_width: Optional[int] = 2) -> np.ndarray:
     """Spike mask ``(N, M)`` from the Whitaker-Hayes test.
 
     The first differences ``d_k = y[k+1] - y[k]`` of every spectrum are scored
-    with the modified z-score. A spike is
+    with the modified z-score.
+
+    ``max_width=None`` is the published rule (Whitaker & Hayes 2018, and the
+    original code): sample ``k`` is flagged for every difference with
+    ``|z_k| > threshold``. Every large difference counts, so the flanks and
+    the top of a band sampled by few points are flagged too (more so at low
+    thresholds such as the original default 3.5).
+
+    With an integer ``max_width`` (the default) a spike is
 
     * a jump ``i`` with ``|z_i| > threshold``,
     * followed within ``max_width`` samples by a jump ``j`` of the opposite
@@ -76,13 +86,16 @@ def whitaker_hayes_mask(spectra: np.ndarray, threshold: float = 7.0, max_width: 
     first or last sample are not detected (the residual pass of ``"wh2"``
     catches wide spikes).
     """
-    if int(max_width) != max_width or max_width < 1:
-        raise ValueError(f"max_width must be a positive integer; got {max_width}")
+    if max_width is not None and (int(max_width) != max_width or max_width < 1):
+        raise ValueError(f"max_width must be None or a positive integer; got {max_width}")
     if not threshold > 0:
         raise ValueError(f"threshold must be positive; got {threshold}")
     spectra = np.atleast_2d(spectra)
     z = modified_zscore(np.diff(spectra, axis=1))
     mask = np.zeros(spectra.shape, dtype=bool)
+    if max_width is None:
+        mask[:, :-1] = np.abs(z) > threshold
+        return mask
     n_diff = z.shape[1]
     for r, i in zip(*np.nonzero(np.abs(z) > threshold)):
         if i > 0 and abs(z[r, i - 1]) > threshold:
@@ -115,8 +128,9 @@ def _replace_by_neighbour_mean(y: np.ndarray, flagged: np.ndarray, m: int,
     return out
 
 
-def despike_whitaker_hayes(ssm: StandardSpectrumMap, threshold: float = 7.0, m: int = 3, *, max_width: int = 2,
-                           protect: Sequence[tuple[float, float]] = ()) -> StandardSpectrumMap:
+def despike_whitaker_hayes(ssm: StandardSpectrumMap, threshold: float = 7.0, m: int = 3, *,
+                           max_width: Optional[int] = 2, protect: Sequence[tuple[float, float]] = ()
+                           ) -> StandardSpectrumMap:
     """Whitaker-Hayes despiking.
 
     Parameters
@@ -124,7 +138,8 @@ def despike_whitaker_hayes(ssm: StandardSpectrumMap, threshold: float = 7.0, m: 
     threshold : modified z-score of the first difference above which a jump counts.
     m : flagged samples are replaced by the mean of the unflagged samples
         within ``+/- m`` samples.
-    max_width : widest spike (in samples) that is detected; see :func:`whitaker_hayes_mask`.
+    max_width : widest spike (in samples) that is detected by the pair rule, or
+        ``None`` for the published rule; see :func:`whitaker_hayes_mask`.
     protect : axis ranges ``(lo, hi)`` that are never modified (for known
         strong, narrow bands whose top would look like a spike). Empty by default.
     """
@@ -173,7 +188,8 @@ def despike_residual(ssm: StandardSpectrumMap, ref_window: int = 9, ref_polyorde
     return ssm.replace(spectra=out)
 
 
-def despike_two_pass(ssm: StandardSpectrumMap, *, wh_threshold: float = 7.0, wh_m: int = 3, wh_max_width: int = 2,
+def despike_two_pass(ssm: StandardSpectrumMap, *, wh_threshold: float = 7.0, wh_m: int = 3,
+                     wh_max_width: Optional[int] = 2,
                      ref_window: int = 9, ref_polyorder: int = 3, resid_threshold: float = 6.0, resid_m: int = 2,
                      resid_replace: str = "ref", protect: Sequence[tuple[float, float]] = ()
                      ) -> tuple[StandardSpectrumMap, StandardSpectrumMap, np.ndarray]:

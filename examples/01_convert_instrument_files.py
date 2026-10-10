@@ -30,6 +30,7 @@ class AppConfig:
 
 
 CONFIG = AppConfig()
+# read_nanobase_csv applies the original orientation by default (x and y swapped, then x negated)
 READERS = {"horiba": read_horiba_txt, "nanobase": read_nanobase_csv, "ntmdt": read_ntmdt_txt}
 
 

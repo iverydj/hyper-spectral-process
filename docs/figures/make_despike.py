@@ -17,6 +17,8 @@ class AppConfig:
     dpi: int = 150
     threshold: float = 7.0
     m: int = 3
+    published_threshold: float = 3.5      # original pipeline default
+    published_m: int = 8
     seed: int = 3
 
 
@@ -32,6 +34,9 @@ def main(cfg: AppConfig) -> None:
     z = modified_zscore(np.diff(y)[None, :])[0]
     mask = whitaker_hayes_mask(y[None, :], cfg.threshold, 2)[0]
     wh = despike_whitaker_hayes(m, cfg.threshold, cfg.m).spectra[0]
+    # the published rule (max_width=None) with the original pipeline defaults (threshold 3.5, m 8)
+    mask_pub = whitaker_hayes_mask(y[None, :], cfg.published_threshold, None)[0]
+    wh_pub = despike_whitaker_hayes(m, cfg.published_threshold, cfg.published_m, max_width=None).spectra[0]
     ref = residual_reference(m.replace(spectra=wh[None, :]), 9, 3)[0]
     res = despike_residual(m.replace(spectra=wh[None, :]), 9, 3, 6.0, m=3, replace="mean",
                            protect=[(140.0, 160.0)]).spectra[0]
@@ -40,9 +45,11 @@ def main(cfg: AppConfig) -> None:
     fig, axes = plt.subplots(2, 2, figsize=(13, 7.5))
     ax = axes[0, 0]
     ax.plot(x, y, color=GREY, lw=0.9, label="spectrum with spikes")
-    ax.plot(x[mask], y[mask], "x", color=RED, ms=7, label="flagged by Whitaker-Hayes")
-    ax.set_title("(a) data: a sharp band, a broad band and three spikes")
-    ax.legend()
+    ax.plot(x[mask_pub], y[mask_pub], "o", mfc="none", color=ORANGE, ms=6,
+            label=f"published rule (max_width=None), threshold {cfg.published_threshold:g}")
+    ax.plot(x[mask], y[mask], "x", color=RED, ms=7, label=f"pair rule (default), threshold {cfg.threshold:g}")
+    ax.set_title("(a) data: a sharp band, a broad band and three spikes; flagged samples")
+    ax.legend(loc="upper right")
     ax = axes[0, 1]
     ax.plot(x[:-1] + 0.5, z, color=BLUE, lw=0.8)
     for s in (1, -1):
@@ -56,10 +63,11 @@ def main(cfg: AppConfig) -> None:
     ax.set_xlabel("sample")
     ax = axes[1, 0]
     ax.plot(x, y, color="0.75", lw=0.8, label="input")
-    ax.plot(x, wh, color=BLUE, lw=1.0, label=f"pass 1: flagged -> mean of unflagged within +/-{cfg.m}")
-    ax.plot(x, clean, color=ORANGE, lw=0.8, ls=":", label="truth")
+    ax.plot(x, wh_pub, color=ORANGE, lw=1.0, ls="--", label="published rule: band flanks and top replaced")
+    ax.plot(x, wh, color=BLUE, lw=1.0, label=f"pair rule: flagged -> mean of unflagged within +/-{cfg.m}")
+    ax.plot(x, clean, color=GREY, lw=0.8, ls=":", label="truth")
     ax.set_ylim(0, 360)
-    ax.set_title("(c) Whitaker-Hayes result: the band top is untouched")
+    ax.set_title("(c) result: the published rule clips the sharp band top,\nthe pair rule leaves it")
     ax.legend(loc="upper left")
     ax = axes[1, 1]
     ax.plot(x, wh, color="0.7", lw=0.8, label="pass 1 (wide spike remains)")

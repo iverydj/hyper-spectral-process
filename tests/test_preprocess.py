@@ -62,6 +62,28 @@ def test_whitaker_hayes_flags_spike_not_band_flank():
     assert np.all(out[~mask] == y[~mask])
 
 
+def test_whitaker_hayes_published_rule_option():
+    from hyper_spectral_process.preprocess._common import modified_zscore
+    x = np.arange(300.0)
+    y = 20 + 300 / (1 + 4 * ((x - 150) / 6.0) ** 2) + np.random.default_rng(3).normal(0, 2.0, x.size)
+    y[60] += 150
+    y[200:202] += 110
+    thr = 3.5                                         # the original pipeline default
+    z = modified_zscore(np.diff(y)[None, :])[0]
+    original = np.flatnonzero(np.abs(z) > thr)        # original rule: sample i of every large difference i
+    mask = whitaker_hayes_mask(y[None, :], threshold=thr, max_width=None)[0]
+    assert np.flatnonzero(mask).tolist() == original.tolist()
+    assert mask[145:156].any() and not whitaker_hayes_mask(y[None, :], thr, max_width=2)[0][145:156].any()
+    out = despike_whitaker_hayes(one(y, x), thr, 8, max_width=None).spectra[0]
+    for k in original:                                # replaced by the mean of the unflagged samples within +/-8
+        lo, hi = max(0, k - 8), min(y.size, k + 9)
+        assert out[k] == pytest.approx(y[lo:hi][~mask[lo:hi]].mean())
+    res = run_pipeline(one(y, x), PreprocessConfig(stage_order=("despike",), derivative=DerivativeParams(orders=()),
+                                                  despike=DespikeParams(mode="wh2", wh1_threshold=thr,
+                                                                        wh1_max_width=None)))
+    np.testing.assert_allclose(res.stages["spike1"].spectra[0], out)
+
+
 def test_whitaker_hayes_keeps_sharp_strong_band_top():
     x = np.arange(300.0)
     y = 20 + 300 / (1 + 4 * ((x - 150) / 6.0) ** 2) + np.random.default_rng(3).normal(0, 2.0, x.size)

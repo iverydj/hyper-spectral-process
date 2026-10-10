@@ -132,7 +132,7 @@ def run_pipeline(ssm: StandardSpectrumMap, cfg: PreprocessConfig, *, splits: Opt
                 keep("spike", cur)
             else:
                 p1, cur, res.despike_reference = despike_two_pass(
-                    cur, wh_threshold=d.wh1_threshold, wh_m=d.wh1_m, wh_max_width=d.wh_max_width,
+                    cur, wh_threshold=d.wh1_threshold, wh_m=d.wh1_m, wh_max_width=d.wh1_max_width,
                     ref_window=d.resid_ref_window, ref_polyorder=d.resid_ref_polyorder,
                     resid_threshold=d.resid_threshold, resid_m=d.resid_m, resid_replace=d.resid_replace,
                     protect=d.protect)
