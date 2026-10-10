@@ -1,0 +1,180 @@
+"""Despike stage: remove cosmic-ray spikes.
+
+Three methods (pipeline ``despike.mode``):
+
+* ``"simple"`` (:func:`despike_simple`): absolute jumps ``|y[k+1] - y[k]|``
+  above a threshold in data units, filled by linear interpolation.
+* ``"wh"`` (:func:`despike_whitaker_hayes`): Whitaker-Hayes detection on the
+  modified z-score of the first difference (Whitaker & Hayes, Chemometr.
+  Intell. Lab. Syst. 179, 82 (2018)); flagged samples are replaced by the
+  mean of their unflagged neighbours.
+* ``"wh2"`` (:func:`despike_two_pass`): ``"wh"`` followed by a residual
+  z-score pass against a Savitzky-Golay reference (:func:`despike_residual`),
+  which catches remnants of wide spikes.
+"""
+from __future__ import annotations
+
+from typing import Sequence
+
+import numpy as np
+from scipy.signal import savgol_filter
+
+from ..io import StandardSpectrumMap
+from ._common import check_savgol, modified_zscore, range_mask
+
+
+# ------------------------------------------------------------------- simple
+def _runs(idx: np.ndarray) -> list[tuple[int, int]]:
+    """Consecutive runs ``(start, end)`` of a sorted integer array."""
+    if idx.size == 0:
+        return []
+    breaks = np.flatnonzero(np.diff(idx) > 1)
+    starts = np.concatenate([[idx[0]], idx[breaks + 1]])
+    ends = np.concatenate([idx[breaks], [idx[-1]]])
+    return list(zip(starts.tolist(), ends.tolist()))
+
+
+def despike_simple(ssm: StandardSpectrumMap, threshold: float) -> StandardSpectrumMap:
+    """Replace jumps larger than ``threshold`` (data units) by linear interpolation.
+
+    For every run of consecutive difference indices ``k`` with
+    ``|y[k+1] - y[k]| > threshold``, the samples ``start .. end`` of the run
+    are replaced by the straight line from ``y[start - 1]`` to ``y[end + 1]``.
+    Runs touching either end of the spectrum are left unchanged.
+    """
+    if not threshold > 0:
+        raise ValueError(f"threshold must be positive; got {threshold}")
+    out = ssm.spectra.copy()
+    m = ssm.n_points
+    for row in out:
+        jumps = np.flatnonzero(np.abs(np.diff(row)) > threshold)
+        for start, end in _runs(jumps):
+            if start == 0 or end >= m - 1:
+                continue
+            n = end - start + 1
+            row[start:end + 1] = np.linspace(row[start - 1], row[end + 1], n + 2)[1:-1]
+    return ssm.replace(spectra=out)
+
+
+# ---------------------------------------------------------- Whitaker-Hayes
+def whitaker_hayes_mask(spectra: np.ndarray, threshold: float = 7.0, max_width: int = 2) -> np.ndarray:
+    """Spike mask ``(N, M)`` from the Whitaker-Hayes test.
+
+    The first differences ``d_k = y[k+1] - y[k]`` of every spectrum are scored
+    with the modified z-score. A spike is a jump with ``|z| > threshold``
+    followed, within ``max_width`` samples, by a jump of the opposite sign
+    with ``|z| > threshold`` (the largest such jump is taken); the samples
+    between the two jumps are flagged. Requiring the up/down pair keeps the
+    steep flanks of real bands from being flagged. Spikes on the first or last
+    sample cannot be detected.
+    """
+    if int(max_width) != max_width or max_width < 1:
+        raise ValueError(f"max_width must be a positive integer; got {max_width}")
+    if not threshold > 0:
+        raise ValueError(f"threshold must be positive; got {threshold}")
+    spectra = np.atleast_2d(spectra)
+    z = modified_zscore(np.diff(spectra, axis=1))
+    mask = np.zeros(spectra.shape, dtype=bool)
+    for r, i in zip(*np.nonzero(np.abs(z) > threshold)):
+        after = z[r, i + 1:i + 1 + max_width]
+        if after.size == 0:
+            continue
+        sign = 1.0 if z[r, i] > 0 else -1.0
+        opposite = -sign * after              # > threshold where the jump has the opposite sign
+        a = int(np.argmax(opposite))
+        if opposite[a] > threshold:
+            mask[r, i + 1:i + 2 + a] = True
+    return mask
+
+
+def _replace_by_neighbour_mean(y: np.ndarray, flagged: np.ndarray, m: int,
+                               reference: np.ndarray | None = None) -> np.ndarray:
+    """Replace flagged samples by the mean of the unflagged samples within ``+/- m``.
+
+    A sample without unflagged neighbours takes the ``reference`` value when
+    one is given (the rule of the residual pass) and raises otherwise.
+    """
+    out = y.copy()
+    for k in np.flatnonzero(flagged):
+        lo, hi = max(0, k - m), min(y.size, k + m + 1)
+        good = ~flagged[lo:hi]
+        if good.any():
+            out[k] = y[lo:hi][good].mean()
+        elif reference is not None:
+            out[k] = reference[k]
+        else:
+            raise ValueError(f"sample {k} has no unflagged neighbour within +/-{m} samples; increase m")
+    return out
+
+
+def despike_whitaker_hayes(ssm: StandardSpectrumMap, threshold: float = 7.0, m: int = 3, *, max_width: int = 2,
+                           protect: Sequence[tuple[float, float]] = ()) -> StandardSpectrumMap:
+    """Whitaker-Hayes despiking.
+
+    Parameters
+    ----------
+    threshold : modified z-score of the first difference above which a jump counts.
+    m : flagged samples are replaced by the mean of the unflagged samples
+        within ``+/- m`` samples.
+    max_width : widest spike (in samples) that is detected; see :func:`whitaker_hayes_mask`.
+    protect : axis ranges ``(lo, hi)`` that are never modified (for known
+        strong, narrow bands whose top would look like a spike). Empty by default.
+    """
+    if int(m) != m or m < 1:
+        raise ValueError(f"m must be a positive integer; got {m}")
+    mask = whitaker_hayes_mask(ssm.spectra, threshold, max_width) & ~range_mask(ssm.axis, protect)[None, :]
+    out = np.array([_replace_by_neighbour_mean(y, f, int(m)) if f.any() else y
+                    for y, f in zip(ssm.spectra, mask)])
+    return ssm.replace(spectra=out)
+
+
+# ---------------------------------------------------------- residual pass
+def residual_reference(ssm: StandardSpectrumMap, window: int = 9, polyorder: int = 3) -> np.ndarray:
+    """Savitzky-Golay reference curve ``(N, M)`` of the residual despike pass."""
+    check_savgol(window, polyorder, ssm.n_points, "ref_window")
+    return savgol_filter(ssm.spectra, int(window), int(polyorder), axis=1, mode="interp")
+
+
+def despike_residual(ssm: StandardSpectrumMap, ref_window: int = 9, ref_polyorder: int = 3, threshold: float = 6.0,
+                     m: int = 2, replace: str = "ref", protect: Sequence[tuple[float, float]] = ()
+                     ) -> StandardSpectrumMap:
+    """Residual z-score despiking.
+
+    A weak Savitzky-Golay smooth of every spectrum is the reference; samples
+    whose residual ``y - reference`` has a modified z-score ``|z| > threshold``
+    are flagged and replaced either by the reference value (``replace="ref"``)
+    or by the mean of the unflagged samples within ``+/- m`` (``"mean"``;
+    a sample with no unflagged neighbour there takes the reference value).
+    The reference is computed from the spectrum including the spike, so with
+    ``"ref"`` the replaced value is pulled towards the spike. The tops of real
+    bands narrower than about ``ref_window`` samples are also flagged.
+    """
+    if replace not in ("ref", "mean"):
+        raise ValueError("replace must be 'ref' or 'mean'")
+    if not threshold > 0:
+        raise ValueError(f"threshold must be positive; got {threshold}")
+    ref = residual_reference(ssm, ref_window, ref_polyorder)
+    mask = (np.abs(modified_zscore(ssm.spectra - ref)) > threshold) & ~range_mask(ssm.axis, protect)[None, :]
+    if replace == "ref":
+        out = np.where(mask, ref, ssm.spectra)
+    else:
+        if int(m) != m or m < 1:
+            raise ValueError(f"m must be a positive integer; got {m}")
+        out = np.array([_replace_by_neighbour_mean(y, f, int(m), r) if f.any() else y
+                        for y, f, r in zip(ssm.spectra, mask, ref)])
+    return ssm.replace(spectra=out)
+
+
+def despike_two_pass(ssm: StandardSpectrumMap, *, wh_threshold: float = 7.0, wh_m: int = 3, wh_max_width: int = 2,
+                     ref_window: int = 9, ref_polyorder: int = 3, resid_threshold: float = 6.0, resid_m: int = 2,
+                     resid_replace: str = "ref", protect: Sequence[tuple[float, float]] = ()
+                     ) -> tuple[StandardSpectrumMap, StandardSpectrumMap, np.ndarray]:
+    """Whitaker-Hayes pass followed by the residual pass.
+
+    Returns ``(pass1, pass2, reference)``: the map after each pass and the
+    Savitzky-Golay reference of the second pass (for QA plots).
+    """
+    pass1 = despike_whitaker_hayes(ssm, wh_threshold, wh_m, max_width=wh_max_width, protect=protect)
+    reference = residual_reference(pass1, ref_window, ref_polyorder)
+    pass2 = despike_residual(pass1, ref_window, ref_polyorder, resid_threshold, resid_m, resid_replace, protect)
+    return pass1, pass2, reference

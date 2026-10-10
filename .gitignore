@@ -10,3 +10,6 @@ dist/
 /runs/
 /results/
 /scratch
+.ipynb_checkpoints/
+# outputs of the example scripts and figure generators
+example_output/

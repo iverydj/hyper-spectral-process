@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hyper-spectral-process"
+version = "0.1.0"
+description = "Preprocessing and GPU-batched multi-peak fitting for hyperspectral Raman and photoluminescence maps"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Dong-Joon Yi" }]
+keywords = ["raman", "photoluminescence", "hyperspectral", "spectroscopy", "peak fitting", "pytorch", "gpu"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+    "numpy>=1.23",
+    "scipy>=1.9",
+    "matplotlib>=3.6",
+    "torch>=2.0",
+]
+
+[project.optional-dependencies]
+qa = ["scikit-learn>=1.2"]
+sif = ["sif_parser"]
+test = ["pytest>=7"]
+
+[project.urls]
+Homepage = "https://github.com/iverydj/hyper-spectral-process"
+Author = "https://iverydj.github.io/"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
