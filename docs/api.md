@@ -167,7 +167,7 @@ Quality-assurance plots for preprocessing.
 - `plot_trace(stages: Mapping[str, StandardSpectrumMap], order: Sequence[str], idx: int, *, baseline_curve: Optional[np.ndarray] = None, despike_reference: Optional[np.ndarray] = None, ncols: int = 2) -> plt.Figure`: Every stage of one spectrum: each panel overlays the previous (solid) and current (dashed) stage.
 - `population_snr(spectra: np.ndarray) -> dict`: Signal-to-noise estimate that treats the mean spectrum as the signal.
 - `plot_overview(ssm: StandardSpectrumMap, title: str = '', *, n: int = 20, seed: int = 42, reference: Optional[tuple[np.ndarray, np.ndarray]] = None, reference_label: str = 'reference') -> plt.Figure`: ``n`` random spectra, the mean spectrum and the :func:`population_snr` numbers.
-- `plot_total_intensity(ssm: StandardSpectrumMap, title: str = '') -> plt.Figure`: Map of the summed intensity of every spectrum.
+- `plot_total_intensity(ssm: StandardSpectrumMap, title: str = '') -> plt.Figure`: Summed intensity of every spectrum drawn at its coordinates.
 - `plot_mixup_examples(before: StandardSpectrumMap, examples: Sequence[dict], *, n: int = 9) -> plt.Figure`: Sources (faint, with their weights), their mixture (black) and the noisy result (red).
 - `plot_cross_file_comparison(results: Mapping[str, StandardSpectrumMap]) -> plt.Figure`: Mean processed spectrum of every input file, on linear and log scales.
 - `stage_display_name(key: str) -> str`: 
@@ -183,7 +183,8 @@ Unit-height peak profiles and their analytic area and FWHM.
 - `lorentzian(x, pos, fwhm)`: Unit-height Lorentzian of FWHM ``fwhm``.
 - `pseudo_voigt(x, pos, fwhm, eta)`: Fixed-eta pseudo-Voigt ``eta L + (1 - eta) G`` with one shared FWHM.
 - `tch_fwhm_eta(width_g, width_l)`: Profile FWHM and mixing ``eta`` (clipped to [0, 1]) of the TCH pseudo-Voigt.
-- `pseudo_voigt_tch(x, pos, width_l, width_g)`: TCH pseudo-Voigt from the Lorentzian FWHM ``width_l`` and the Gaussian FWHM ``width_g``.
+- `tch_height_fraction(eta)`: Lorentzian fraction of the peak height for the area fraction ``eta`` (same FWHM).
+- `pseudo_voigt_tch(x, pos, width_l, width_g)`: Unit-height TCH pseudo-Voigt from the Lorentzian FWHM ``width_l`` and the Gaussian FWHM ``width_g``.
 - `fano(x, pos, width, q)`: Unit-height Breit-Wigner-Fano profile with resonance FWHM ``width`` and asymmetry ``q``.
 - `peak_area(peak_type: str, height, width, eta=None, width_g=None)`: Analytic integral of ``height * profile`` over the whole axis (NumPy).
 - `peak_fwhm(peak_type: str, width, width_g=None, q=None)`: FWHM of the profile (NumPy).
