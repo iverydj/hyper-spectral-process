@@ -97,7 +97,8 @@ def _n_params(fsm: FitSpectrumMap) -> int:
     return k + (1 if fsm.metadata.get("fit_baseline") else 0)
 
 
-def select_variants(fits: Mapping[str, FitSpectrumMap], *, input_peaks: Optional[Mapping[str, Sequence[PeakSpec]]] = None,
+def select_variants(fits: Mapping[str, FitSpectrumMap], *,
+                    input_peaks: Optional[Mapping[str, Sequence[PeakSpec]]] = None,
                     drift_penalty_alpha: float = 0.0) -> VariantSelection:
     """Choose the variant with the lowest (drift-penalised) BIC for every pixel (see the module docstring).
 

@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software in your research, please cite it as below."
+title: "hyper-spectral-process: preprocessing and GPU-batched multi-peak fitting of hyperspectral maps"
+type: software
+authors:
+  - family-names: "Yi"
+    given-names: "Dong-Joon"
+    website: "https://iverydj.github.io/"
+version: "0.1.0"
+license: MIT
+repository-code: "https://github.com/iverydj/hyper-spectral-process"
+keywords:
+  - Raman spectroscopy
+  - photoluminescence
+  - hyperspectral imaging
+  - peak fitting
+  - preprocessing
+  - PyTorch
+  - GPU

@@ -61,12 +61,22 @@ def whitaker_hayes_mask(spectra: np.ndarray, threshold: float = 7.0, max_width: 
     """Spike mask ``(N, M)`` from the Whitaker-Hayes test.
 
     The first differences ``d_k = y[k+1] - y[k]`` of every spectrum are scored
-    with the modified z-score. A spike is a jump with ``|z| > threshold``
-    followed, within ``max_width`` samples, by a jump of the opposite sign
-    with ``|z| > threshold`` (the largest such jump is taken); the samples
-    between the two jumps are flagged. Requiring the up/down pair keeps the
-    steep flanks of real bands from being flagged. Spikes on the first or last
-    sample cannot be detected.
+    with the modified z-score. A spike is
+
+    * a jump ``i`` with ``|z_i| > threshold``,
+    * followed within ``max_width`` samples by a jump ``j`` of the opposite
+      sign with ``|z_j| > threshold`` (the largest such jump is taken),
+    * with ordinary differences just outside the pair (``|z_{i-1}|`` and
+      ``|z_{j+1}| <= threshold``): the spike stands on a background that is
+      flat at the noise level.
+
+    The samples ``i + 1 .. j`` between the two jumps are flagged. The pair
+    condition keeps the steep flanks of real bands from being flagged and the
+    isolation condition keeps the top of a sharp, strong band (whose flanks
+    are themselves large jumps) from being flagged. A spike on the steep
+    flank of a sharp band, a spike wider than ``max_width`` and a spike on the
+    first or last sample are not detected (the residual pass of ``"wh2"``
+    catches wide spikes).
     """
     if int(max_width) != max_width or max_width < 1:
         raise ValueError(f"max_width must be a positive integer; got {max_width}")
@@ -82,8 +92,10 @@ def whitaker_hayes_mask(spectra: np.ndarray, threshold: float = 7.0, max_width: 
         sign = 1.0 if z[r, i] > 0 else -1.0
         opposite = -sign * after              # > threshold where the jump has the opposite sign
         a = int(np.argmax(opposite))
-        if opposite[a] > threshold:
-            mask[r, i + 1:i + 2 + a] = True
+        j = i + 1 + a
+        isolated = (i == 0 or abs(z[r, i - 1]) <= threshold) and (j + 1 >= z.shape[1] or abs(z[r, j + 1]) <= threshold)
+        if opposite[a] > threshold and isolated:
+            mask[r, i + 1:j + 1] = True
     return mask
 
 

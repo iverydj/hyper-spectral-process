@@ -152,11 +152,17 @@ def plot_overview(ssm: StandardSpectrumMap, title: str = "", *, n: int = 20, see
 
 
 def plot_total_intensity(ssm: StandardSpectrumMap, title: str = "") -> plt.Figure:
-    """Map of the summed intensity of every spectrum."""
+    """Summed intensity of every spectrum drawn at its coordinates.
+
+    Square markers (``plot_map(layout="scatter")``) are used so that inputs
+    whose coordinates are not a raster (e.g. a list of spectra with dummy
+    coordinates, or the placeholder coordinates of augmented spectra) can be
+    shown too.
+    """
     from ..plot.maps import plot_map
 
     fig, ax = plt.subplots(figsize=(6.5, 5.5))
-    plot_map(ax, ssm.xy, ssm.spectra.sum(axis=1), label="total intensity")
+    plot_map(ax, ssm.xy, ssm.spectra.sum(axis=1), label="total intensity", layout="scatter")
     ax.set_title(title)
     fig.tight_layout()
     return fig
@@ -280,7 +286,8 @@ def plot_tsne_stages(embeddings: Mapping[str, tuple], *, max_cols: int = 5, poin
     for ax in list(axes.flat)[len(keys):]:
         ax.axis("off")
     handles, labels = axes.flat[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", ncol=min(6, len(classes)), frameon=False, markerscale=2)
-    fig.suptitle(title, y=1.02)
-    fig.tight_layout()
+    fig.suptitle(title, y=0.995)
+    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.955), ncol=min(6, len(classes)),
+               frameon=False, markerscale=2)
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
     return fig

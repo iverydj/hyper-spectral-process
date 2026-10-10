@@ -282,7 +282,8 @@ def _tsne(sources: list, cfg: PreprocessConfig, out_dir: Path) -> None:
     perplexities = list(dict.fromkeys(float(p) for p in np.atleast_1d(q.tsne_perplexity)))
     for perp in perplexities:
         emb = qa.tsne_embeddings(sources, keys, perplexity=perp, max_iter=q.tsne_max_iter,
-                                 random_state=q.tsne_random_state, n_jobs=q.tsne_n_jobs, thread_limit=q.tsne_thread_limit)
+                                 random_state=q.tsne_random_state, n_jobs=q.tsne_n_jobs,
+                                 thread_limit=q.tsne_thread_limit)
         sub = out_dir / f"perp_{int(round(perp)):03d}" if len(perplexities) > 1 else out_dir
         fig = qa.plot_tsne_stages(emb, max_cols=q.tsne_max_cols, point_size=q.tsne_point_size, alpha=q.tsne_alpha,
                                   title=f"Class-wise t-SNE across preprocessing stages (perplexity {perp:g})")

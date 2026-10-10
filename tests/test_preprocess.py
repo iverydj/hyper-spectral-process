@@ -2,7 +2,8 @@ import numpy as np
 import pytest
 
 from hyper_spectral_process.io import StandardSpectrumMap
-from hyper_spectral_process.preprocess import (BaselineParams, DerivativeParams, DespikeParams, InputFile, NormalizeParams,
+from hyper_spectral_process.preprocess import (BaselineParams, DerivativeParams, DespikeParams, InputFile,
+                                               NormalizeParams,
                                                PreprocessConfig, QAParams, RoiParams, SplitParams, anchor_baseline,
                                                crop_roi, despike_residual, despike_simple, despike_two_pass,
                                                despike_whitaker_hayes, fill_masked, interpolate, interpolation_axis,
@@ -59,6 +60,14 @@ def test_whitaker_hayes_flags_spike_not_band_flank():
     out = despike_whitaker_hayes(one(y, x), 7.0, 3).spectra[0]
     assert abs(out[100] - np.mean(y[[97, 98, 99, 101, 102, 103]])) < 1e-9
     assert np.all(out[~mask] == y[~mask])
+
+
+def test_whitaker_hayes_keeps_sharp_strong_band_top():
+    x = np.arange(300.0)
+    y = 20 + 300 / (1 + 4 * ((x - 150) / 6.0) ** 2) + np.random.default_rng(3).normal(0, 2.0, x.size)
+    y[60] += 150
+    mask = whitaker_hayes_mask(y[None, :], threshold=7.0, max_width=2)[0]
+    assert np.flatnonzero(mask).tolist() == [60]
 
 
 def test_whitaker_hayes_protect_and_zero_mad():
