@@ -119,8 +119,9 @@ def format_peaks_block(peaks, *, conversion: Optional[dict] = None, variable: st
 
     Refined peaks of an energy-space fit are converted back to the input
     unit (nm) when ``conversion`` (the ``PreparedMap.conversion`` record) is
-    given. Values are rounded for readability (positions and widths to 4
-    significant digits, heights to 3 decimals); regs are kept exactly.
+    given. Values are rounded for readability (positions to 6 and widths and
+    limits to 4 significant digits, heights to 3 decimals); regs are kept
+    exactly.
     """
     lines = [f"{variable} = ["]
     for p in peaks:

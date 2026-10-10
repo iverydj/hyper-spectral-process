@@ -86,4 +86,69 @@ pixel's winner has no such peak.
 
 ## 05: Raman and PL maps of monolayer MoS2
 
-MOS2_SECTION
+Data: the bundled maps of monolayer MoS2 on a wrinkled substrate (88 x 81
+points, 0.3 um step, 532 nm excitation; see
+`examples/data/mos2_wrinkled/README.md`). The goal is a set of parameter
+maps; the analysis is built from the library functions in two stages so that
+no baseline term competes with the bands during the band fit.
+
+**Stage 1, background extraction** (`subtract_baseline(mode="anchors")`):
+
+- Raman: the off-flake spectra are a straight line between 300 and
+  505 cm^-1, so the background of every spectrum is a straight line fitted to
+  the anchor ranges 300-345 and 478-505 cm^-1 (outside the fitted bands and
+  the 2LA(M) band near 450 cm^-1).
+- PL: the substrate emits a broad band that no low-order polynomial
+  describes, so the background is a measured spectrum: the mean of the
+  off-flake pixels (more than 4 pixels from any on-flake pixel, 3966 spectra),
+  smoothed (Savitzky-Golay 31, 3), scaled to every spectrum by least squares
+  in the anchor 2.17-2.21 eV (above the B exciton, below the Raman lines).
+
+**Axis and Jacobian** (PL): the map is stored on a Raman-shift axis; it is
+converted to wavelength by relabelling only (`raman_shift_to_wavelength(...,
+jacobian=False)`), because the detector pixels have a constant width in
+wavelength (0.214 nm, uniform within 1 %, checked by the script), so the
+counts per pixel are a density per unit wavelength; then to photon energy
+with the lambda^2 Jacobian (`wavelength_to_energy(..., jacobian=True)`), which
+makes them a density per unit energy, the quantity the band shapes describe.
+
+**Stage 2, band fit** (`fit_map` / `fit_variants`, `fit_baseline=False`,
+spectra divided by the height of their main band, no minimum shift):
+
+- Raman, window 350-418 cm^-1: a weak broad Gaussian near 376 cm^-1
+  (unassigned; it carries intensity between the bands), Gaussian E2g,
+  Lorentzian A1g. Pixels whose A1g height exceeds the map median by 5 robust
+  standard deviations are fitted (2,261); pixels whose A1g-E2g separation is
+  more than 4 robust standard deviations above the median are left out of
+  the maps (a small few-layer island near the centre), leaving 2,201
+  monolayer pixels.
+- PL, window 1.70-2.12 eV, zero weight on the one detector column the export
+  interpolated: three variants, A0 + B, A0 + A- and A0 + A- + B (Gaussian
+  A0, Lorentzian A-, Gaussian B), compared pixel by pixel with the BIC
+  (2,297 pixels fitted).
+
+![MoS2 Raman](figures/examples/mos2_raman.png)
+
+Raman results (medians over the monolayer pixels): E2g at 383.69 cm^-1,
+A1g at 403.33 cm^-1, separation 19.62 cm^-1, FWHM 4.72 (E2g) and 5.02
+(A1g) cm^-1, area ratio A1g/E2g 5.2. The position and width maps follow the
+wrinkle stripes.
+
+![MoS2 PL](figures/examples/mos2_pl.png)
+
+PL results: the BIC chooses all three bands in 95.6 % of the fitted pixels
+(A0 + B 3.4 %, A0 + A- 1.0 %). The peak energy and FWHM of the total fitted
+band, which do not depend on how the band is decomposed (found on a 0.2 meV
+grid), have medians of 1.860 eV and 124 meV. Following common practice for
+room-temperature monolayer MoS2, the low-energy component is assigned to the
+negative trion A- (K. F. Mak et al., Nat. Mater. 12, 207 (2013); S. Mouri,
+Y. Miyauchi and K. Matsuda, Nano Lett. 13, 5944 (2013)); the median fitted
+centres are 1.866 eV (A0) and 1.811 eV (A-), and the median trion weight
+A-/(A0 + A-) where A- is selected is 0.54.
+
+The two maps are shown in their own stage coordinates: the PL export's
+coordinates are offset from the Raman export's by about (-0.4, -5.9) um,
+so register the images (for example by cross-correlating intensity maps)
+before combining Raman and PL values pixel by pixel. Run time on 12 CPU
+threads: about 5 minutes for the Raman map and 14 minutes for the three PL
+variants; a GPU shortens both.

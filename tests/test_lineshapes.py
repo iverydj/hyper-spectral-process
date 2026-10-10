@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 import torch
 from scipy.integrate import quad
+from scipy.optimize import least_squares
 from scipy.special import voigt_profile
 
 from hyper_spectral_process.fit.lineshapes import (fano, gaussian, lorentzian, peak_area, peak_fwhm, pseudo_voigt,
@@ -36,6 +37,19 @@ def test_tch_limits_and_voigt_accuracy():
     assert tch.max() == pytest.approx(1.0)
     assert numeric_fwhm(X, tch) == pytest.approx(numeric_fwhm(X, voigt), rel=0.01)
     assert np.max(np.abs(tch - voigt)) < 0.02             # TCH approximates the Voigt profile within ~1 %
+
+
+@pytest.mark.parametrize("gl,gg", [(3.0, 3.0), (1.0, 3.0), (3.0, 1.5)])
+def test_tch_fit_of_a_voigt_recovers_both_widths(gl, gg):
+    x = np.linspace(-40, 40, 8001)
+    sigma, gamma = gg / (2 * np.sqrt(2 * np.log(2))), gl / 2
+    v = voigt_profile(x, sigma, gamma)
+    area = 1.0 / v.max()                          # area of the unit-height Voigt profile
+    v = v / v.max()
+    fit = least_squares(lambda p: p[2] * pseudo_voigt_tch(x, 0.0, p[0], p[1]) - v, x0=[2.0, 2.0, 1.0],
+                        bounds=(0.01, 20))                 # widths and height free, as in a peak fit
+    np.testing.assert_allclose(fit.x[:2], [gl, gg], rtol=0.01)
+    assert float(peak_area("pseudovoigt", 1.0, gl, width_g=gg)) == pytest.approx(area, rel=0.005)
 
 
 def test_fano_shape():

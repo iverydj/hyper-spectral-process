@@ -127,6 +127,26 @@ def test_energy_space_fit_applies_jacobian():
     assert back.pos == pytest.approx(p_nm.pos) and back.width == pytest.approx(p_nm.width)
 
 
+def test_energy_conversion_mirrors_fano_and_keeps_peak_order():
+    from hyper_spectral_process.fit import config_to_energy
+    from hyper_spectral_process.fit.lineshapes import fano
+    f = PeakSpec("fano", 650.0, 10.0, 1.0, 5.0, 0.0, 5.0, 0.0, 0.5, 0.0, extra={"q": 3.0, "q_range": (0.5, 50.0)})
+    e = peak_to_energy(f, "eV", 650.0)
+    assert e.get("q") == -3.0 and e.get("q_range") == (-50.0, -0.5)
+    g = peak("gaussian", 600.0, 10.0, 1.0)
+    cfg = config_to_energy(FitConfig((f, g), FAST), "eV", 650.0)
+    assert [p.type for p in cfg.fit_peaks()] == ["gaussian", "fano"]          # nm order kept
+    lam = np.linspace(560, 760, 1500)
+    band_e = fano(HC_EV_NM / lam, 1.90, 0.08, -3.0)                         # q = -3 per unit energy
+    m = StandardSpectrumMap((band_e * HC_EV_NM / lam**2)[None, :], [[0.0, 0.0]], lam, "nm")
+    p_nm = PeakSpec("fano", HC_EV_NM / 1.89, 25.0, 1.0, 10.0, 0.0, 10.0, 0.0, 0.5, 0.0,
+                    extra={"q": 2.5, "q_range": (0.5, 50.0)})                # the asymmetry as seen in nm
+    r = fit_map(m, FitConfig((p_nm,), (StageSpec("a", 3000, 2e-3), StageSpec("b", 2000, 2e-4)), fit_baseline=True,
+                             x_fit_range=(580, 740)),
+                MapFitOptions(fit_axis_space="eV", skip_low_signal=False)).result
+    assert r.q[0, 0] == pytest.approx(-3.0, rel=0.03) and r.pos[0, 0] == pytest.approx(1.90, abs=1e-3)
+
+
 def test_options_fail_loudly():
     sm = two_peak_map(shape=(2, 2))
     cfg = FitConfig((peak("lorentzian", 384, 5, 0.9),), FAST)

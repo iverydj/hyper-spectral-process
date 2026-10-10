@@ -15,10 +15,14 @@ arrays or torch tensors (``d = x - pos``):
   mixing ``eta`` through
 
       Gamma^5 = G^5 + 2.69269 G^4 L + 2.42843 G^3 L^2 + 4.47163 G^2 L^3 + 0.07842 G L^4 + L^5
-      eta     = 1.36603 r - 0.47719 r^2 + 0.11116 r^3,   r = L / Gamma
+      eta     = 1.36603 r - 0.47719 r^2 + 0.11116 r^3,   r = L / Gamma.
 
-  and the profile is ``eta L(x; Gamma) + (1 - eta) G(x; Gamma)``, an
-  approximation of the Voigt profile within about 1 %.
+  ``eta`` is the Lorentzian fraction of the *area*: the Voigt profile is
+  approximated by ``eta L_a + (1 - eta) G_a`` with unit-area components of
+  FWHM ``Gamma`` (within about 1 %). Scaled to unit height this is
+  ``eta_h L + (1 - eta_h) G`` with the height fraction
+  ``eta_h = (eta / C_L) / (eta / C_L + (1 - eta) / C_G)`` (``C_G``, ``C_L``: the
+  area per unit FWHM of a unit-height Gaussian and Lorentzian).
 * Breit-Wigner-Fano with resonance FWHM ``w`` (``gamma = w / 2``) and
   asymmetry ``q``:
 
@@ -82,10 +86,16 @@ def tch_fwhm_eta(width_g, width_l):
     return fwhm, _clip01(b[0] * r + b[1] * r**2 + b[2] * r**3)
 
 
+def tch_height_fraction(eta):
+    """Lorentzian fraction of the peak height for the area fraction ``eta`` (same FWHM)."""
+    a = eta / AREA_C_LORENTZ
+    return a / (a + (1.0 - eta) / AREA_C_GAUSS)
+
+
 def pseudo_voigt_tch(x, pos, width_l, width_g):
-    """TCH pseudo-Voigt from the Lorentzian FWHM ``width_l`` and the Gaussian FWHM ``width_g``."""
+    """Unit-height TCH pseudo-Voigt from the Lorentzian FWHM ``width_l`` and the Gaussian FWHM ``width_g``."""
     fwhm, eta = tch_fwhm_eta(width_g, width_l)
-    return pseudo_voigt(x, pos, fwhm, eta)
+    return pseudo_voigt(x, pos, fwhm, tch_height_fraction(eta))
 
 
 def fano(x, pos, width, q):
@@ -99,9 +109,11 @@ def fano(x, pos, width, q):
 def peak_area(peak_type: str, height, width, eta=None, width_g=None):
     """Analytic integral of ``height * profile`` over the whole axis (NumPy).
 
-    Gaussian, Lorentzian and fixed-eta pseudo-Voigt: ``height * width *
-    ((1 - eta) C_G + eta C_L)``; TCH pseudo-Voigt: the same with the profile
-    FWHM and eta from :func:`tch_fwhm_eta`; Fano: NaN (divergent integral).
+    Gaussian, Lorentzian and fixed-eta pseudo-Voigt (``eta`` = height
+    fraction): ``height * width * ((1 - eta) C_G + eta C_L)``; TCH
+    pseudo-Voigt (``eta`` = area fraction from :func:`tch_fwhm_eta`, the width
+    arguments are used): ``height * Gamma / (eta / C_L + (1 - eta) / C_G)``;
+    Fano: NaN (divergent integral).
     """
     height = np.asarray(height, dtype=np.float64)
     width = np.asarray(width, dtype=np.float64)
@@ -109,6 +121,7 @@ def peak_area(peak_type: str, height, width, eta=None, width_g=None):
         return np.full(np.broadcast(height, width).shape, np.nan)
     if peak_type == "pseudovoigt":
         fwhm, e = tch_fwhm_eta(np.asarray(width_g, dtype=np.float64), width)
+        return height * fwhm / (e / AREA_C_LORENTZ + (1.0 - e) / AREA_C_GAUSS)
     else:
         fwhm = width
         e = {"gaussian": 0.0, "lorentzian": 1.0}.get(peak_type, eta)

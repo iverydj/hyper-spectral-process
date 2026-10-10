@@ -95,9 +95,10 @@ def peakstrip_baseline(y: np.ndarray, window_min: int, window_max: int, polyorde
     The spectrum is padded on both sides with ``ceil(M / 2)`` copies of its end
     values. Then, for the windows of :func:`strip_windows`, it is repeatedly
     replaced by ``min(s, savgol(s, w, polyorder))``; the area removed by each
-    iteration is recorded and the loop stops at the first local minimum of
-    that area (the result of that iteration is the baseline). If no minimum
-    occurs, the last iteration is used. Samples in the boolean ``protect``
+    iteration is recorded and, from the fourth iteration on, the loop stops as
+    soon as the area of the previous iteration is a local minimum (smaller
+    than its two neighbours); the result of that iteration is the baseline.
+    If no minimum occurs, the last iteration is used. Samples in the boolean ``protect``
     mask are first bridged by :func:`fill_masked`, so the baseline cannot
     follow a protected peak.
     """

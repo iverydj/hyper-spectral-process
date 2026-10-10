@@ -47,7 +47,7 @@ class VariantSelection:
     """Per-pixel choice between ``K`` variants (arrays ``(K, N)`` unless noted)."""
 
     names: tuple
-    variant_id: np.ndarray        # (N,) index of the winner, -1 where no variant is valid
+    variant_id: np.ndarray        # (N,) index of the winner, -1 where any variant is invalid
     k_params: np.ndarray          # (K,)
     bic: np.ndarray               # BIC including the drift penalty (inf where invalid)
     bic_raw: np.ndarray           # BIC without the penalty

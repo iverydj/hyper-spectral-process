@@ -37,22 +37,20 @@ def _runs(idx: np.ndarray) -> list[tuple[int, int]]:
 def despike_simple(ssm: StandardSpectrumMap, threshold: float) -> StandardSpectrumMap:
     """Replace jumps larger than ``threshold`` (data units) by linear interpolation.
 
-    For every run of consecutive difference indices ``k`` with
-    ``|y[k+1] - y[k]| > threshold``, the samples ``start .. end`` of the run
-    are replaced by the straight line from ``y[start - 1]`` to ``y[end + 1]``.
-    Runs touching either end of the spectrum are left unchanged.
+    For every run of consecutive difference indices ``start .. end`` with
+    ``|y[k+1] - y[k]| > threshold``, the samples between the first and the last
+    jump, ``start + 1 .. end``, are replaced by the straight line from
+    ``y[start]`` to ``y[end + 1]``. A single jump (a step) changes nothing.
     """
     if not threshold > 0:
         raise ValueError(f"threshold must be positive; got {threshold}")
     out = ssm.spectra.copy()
-    m = ssm.n_points
     for row in out:
         jumps = np.flatnonzero(np.abs(np.diff(row)) > threshold)
         for start, end in _runs(jumps):
-            if start == 0 or end >= m - 1:
-                continue
-            n = end - start + 1
-            row[start:end + 1] = np.linspace(row[start - 1], row[end + 1], n + 2)[1:-1]
+            n = end - start
+            if n > 0:
+                row[start + 1:end + 1] = np.linspace(row[start], row[end + 1], n + 2)[1:-1]
     return ssm.replace(spectra=out)
 
 
@@ -65,10 +63,10 @@ def whitaker_hayes_mask(spectra: np.ndarray, threshold: float = 7.0, max_width: 
 
     * a jump ``i`` with ``|z_i| > threshold``,
     * followed within ``max_width`` samples by a jump ``j`` of the opposite
-      sign with ``|z_j| > threshold`` (the largest such jump is taken),
+      sign with ``|z_j| > threshold``,
     * with ordinary differences just outside the pair (``|z_{i-1}|`` and
       ``|z_{j+1}| <= threshold``): the spike stands on a background that is
-      flat at the noise level.
+      flat at the noise level. The farthest ``j`` that satisfies this is taken.
 
     The samples ``i + 1 .. j`` between the two jumps are flagged. The pair
     condition keeps the steep flanks of real bands from being flagged and the
@@ -85,17 +83,15 @@ def whitaker_hayes_mask(spectra: np.ndarray, threshold: float = 7.0, max_width: 
     spectra = np.atleast_2d(spectra)
     z = modified_zscore(np.diff(spectra, axis=1))
     mask = np.zeros(spectra.shape, dtype=bool)
+    n_diff = z.shape[1]
     for r, i in zip(*np.nonzero(np.abs(z) > threshold)):
-        after = z[r, i + 1:i + 1 + max_width]
-        if after.size == 0:
-            continue
+        if i > 0 and abs(z[r, i - 1]) > threshold:
+            continue                          # the jump continues a run of large differences
         sign = 1.0 if z[r, i] > 0 else -1.0
-        opposite = -sign * after              # > threshold where the jump has the opposite sign
-        a = int(np.argmax(opposite))
-        j = i + 1 + a
-        isolated = (i == 0 or abs(z[r, i - 1]) <= threshold) and (j + 1 >= z.shape[1] or abs(z[r, j + 1]) <= threshold)
-        if opposite[a] > threshold and isolated:
-            mask[r, i + 1:j + 1] = True
+        for j in range(min(i + max_width, n_diff - 1), i, -1):     # farthest closing jump first
+            if -sign * z[r, j] > threshold and (j + 1 >= n_diff or abs(z[r, j + 1]) <= threshold):
+                mask[r, i + 1:j + 1] = True
+                break
     return mask
 
 

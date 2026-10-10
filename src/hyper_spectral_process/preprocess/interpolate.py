@@ -25,7 +25,8 @@ def interpolation_axis(source_axis: np.ndarray, step: float, round_decimals: Opt
     if not (math.isfinite(step) and step > 0):
         raise ValueError(f"interpolation step must be a positive finite number; got {step}")
     start = float(math.floor(src.min()) + 1)
-    n = int(np.floor((src.max() - start) / step)) + 1 if start <= src.max() else 0
+    # the relative tolerance keeps a last point that equals the maximum up to rounding
+    n = int(np.floor((src.max() - start) / step + 1e-9)) + 1 if start <= src.max() else 0
     if n < 2:
         raise ValueError(f"interpolation axis needs at least 2 points (start {start}, axis max {src.max()}, "
                          f"step {step})")

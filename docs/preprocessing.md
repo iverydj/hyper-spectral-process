@@ -85,9 +85,9 @@ D. A. Whitaker and K. Hayes, Chemometr. Intell. Lab. Syst. 179, 82 (2018)).
    the modified z-score `z = 0.6745 (d - median(d)) / MAD(d)` (panel b).
 2. A spike is a jump `|z_i| > threshold` followed within `max_width` samples
    by a jump of the opposite sign `|z_j| > threshold`, with ordinary
-   differences (`|z| <= threshold`) just outside the pair. The samples between
-   the two jumps are flagged (panel a). Both upward and downward spikes are
-   detected.
+   differences (`|z| <= threshold`) just outside the pair (the farthest such
+   `j` is taken). The samples between the two jumps are flagged (panel a).
+   Both upward and downward spikes are detected.
 3. Every flagged sample is replaced by the mean of the unflagged samples
    within `+/- m` samples (panel c).
 
@@ -119,9 +119,10 @@ Pitfalls: the reference is computed from the spectrum *with* the spike, so
 the replacement is pulled towards it; the tops of bands narrower than about
 `resid_ref_window` samples are flagged too, so protect such bands.
 
-**`"simple"`** (`despike_simple(ssm, threshold)`): every run of differences
-with `|d| > sf_threshold` (data units) is replaced by the straight line between
-the samples on either side of the run. Simple and fast, but the threshold is
+**`"simple"`** (`despike_simple(ssm, threshold)`): for every run of
+consecutive differences with `|d| > sf_threshold` (data units), the samples
+between the first and the last jump are replaced by the straight line between
+the samples on either side. Simple and fast, but the threshold is
 absolute (it depends on the intensity scale) and steep band flanks exceed it.
 
 ## smooth / smooth2nd
@@ -155,8 +156,9 @@ first shifts each spectrum so its minimum is 0, then divides by
 `peak_height(axis, y, window, refine)`: with `refine = k > 0` a parabola is
 fitted through the window maximum and its `k` neighbours on each side and the
 vertex height is used, which keeps single-sample noise out of the scale; if
-the maximum is closer than `k` samples to the spectrum edge, or the parabola
-is not concave, the sample maximum is used.
+the maximum is closer than `k` samples to the spectrum edge, the parabola is
+not concave, or its vertex lies outside the fitted samples, the sample
+maximum is used.
 
 Pitfalls: `instance` switches the anchor band from spectrum to spectrum when
 two bands have similar heights (panel b); the minimum shift adds an offset
@@ -182,8 +184,9 @@ longer than the spectrum, or fewer than two distinct nodes, raises. Defaults
 the spectrum is padded on both sides with `ceil(M/2)` copies of its end
 values; then for the windows `w = window_min, window_min + 2, ..., window_max`
 (made odd, `strip_windows`) it is replaced by `min(s, SavGol(s, w, polyorder))`.
-The area removed by each iteration is recorded and the loop stops at its
-first local minimum; that iteration's result is the baseline. `window_max` is
+The area removed by each iteration is recorded; from the fourth iteration on
+the loop stops when the previous iteration's area is a local minimum, and that
+iteration's result is the baseline (the last one if no minimum occurs). `window_max` is
 the main knob: small values cut into broad bands, large values leave broad
 backgrounds. Defaults `121`/`1111` samples, `polyorder=0` (moving average).
 
@@ -242,7 +245,7 @@ pool `"all"`.
 **augmentation** (`mixup(pool, n_new, rng, ...)`): for every split listed in
 `AugmentationParams.splits`, `max_new_per_split[split]` synthetic spectra are
 appended, each made from the original (non-augmented) spectra of that split
-only: the number of sources `k` is uniform in `[mixup_min_sources,
+only: the number of sources `k` is uniform in `[max(2, mixup_min_sources),
 min(mixup_max_sources, pool size)]`, the weights follow a symmetric Dirichlet
 distribution whose concentration is drawn uniformly from `mixup_alpha_range`
 (small concentrations give one dominant source), and Gaussian noise of

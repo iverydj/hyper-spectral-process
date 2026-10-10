@@ -39,7 +39,7 @@ def main(cfg: AppConfig) -> None:
     for wg, c in zip((0.5, 2.0, 4.0, 8.0), plt.get_cmap("plasma")(np.linspace(0, 0.85, 4))):
         fw, eta = tch_fwhm_eta(np.array(wg), np.array(w))
         ax.plot(x, pseudo_voigt_tch(x, 0, w, wg), color=c,
-                label=f"$\\Gamma_G$={wg:g}: FWHM {float(fw):.2f}, eta {float(eta):.2f}")
+                label=f"$\\Gamma_G$={wg:g}: FWHM {float(fw):.2f}, area eta {float(eta):.2f}")
     ax.set_title(f"pseudovoigt (TCH): width = $\\Gamma_L$ = {w:g},\nextra width_g = $\\Gamma_G$; FWHM and eta follow")
     ax.legend(fontsize=7)
 

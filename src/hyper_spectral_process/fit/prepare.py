@@ -139,8 +139,11 @@ def peak_to_energy(peak: PeakSpec, unit: str, reference_nm: float) -> PeakSpec:
 
     ``pos`` maps exactly (``K / lambda``); widths and their limits are scaled
     by ``|dE/d lambda| = K / lambda^2`` at the peak; heights and their limit
-    by the relative Jacobian ``(lambda / reference_nm)^2``. Dimensionless
-    values (regs, ``q``, ``eta``) are unchanged.
+    by the relative Jacobian ``(lambda / reference_nm)^2``. ``E = K / lambda``
+    reverses the axis, so a Fano asymmetry changes sign: ``q -> -q`` and
+    ``q_range (lo, hi) -> (-hi, -lo)``. Regs, ``q_limit`` and ``eta`` are
+    unchanged. The mapping of widths (and of a Fano shape) is first order in
+    the width over the position.
     """
     k = energy_constant(unit)
     lam = float(peak.pos)
@@ -148,13 +151,23 @@ def peak_to_energy(peak: PeakSpec, unit: str, reference_nm: float) -> PeakSpec:
         raise ValueError(f"peak position {lam} nm must be positive")
     scale = k / lam**2
     jac = (lam / reference_nm) ** 2
+    extra = _mirror_extra(peak, scale)
+    return replace(peak, pos=k / lam, width=peak.width * scale, pos_limit=peak.pos_limit * scale,
+                   width_limit=peak.width_limit * scale, height=peak.height * jac,
+                   height_limit=peak.height_limit * jac, extra=extra or None)
+
+
+def _mirror_extra(peak: PeakSpec, scale: float) -> dict:
+    """``extra`` of a peak under an axis reversal: widths scaled, Fano asymmetry mirrored."""
     extra = dict(peak.extra or {})
     for key in ("width_g", "width_g_limit"):
         if key in extra:
             extra[key] = float(extra[key]) * scale
-    return replace(peak, pos=k / lam, width=peak.width * scale, pos_limit=peak.pos_limit * scale,
-                   width_limit=peak.width_limit * scale, height=peak.height * jac,
-                   height_limit=peak.height_limit * jac, extra=extra or None)
+    if peak.type == "fano":
+        lo, hi = peak.get("q_range")
+        extra["q"] = -float(peak.get("q"))
+        extra["q_range"] = (-float(hi), -float(lo))
+    return extra
 
 
 def peak_to_wavelength(peak: PeakSpec, unit: str, reference_nm: float) -> PeakSpec:
@@ -166,10 +179,7 @@ def peak_to_wavelength(peak: PeakSpec, unit: str, reference_nm: float) -> PeakSp
     lam = k / e
     scale = lam**2 / k
     jac = (lam / reference_nm) ** 2
-    extra = dict(peak.extra or {})
-    for key in ("width_g", "width_g_limit"):
-        if key in extra:
-            extra[key] = float(extra[key]) * scale
+    extra = _mirror_extra(peak, scale)
     return replace(peak, pos=lam, width=peak.width * scale, pos_limit=peak.pos_limit * scale,
                    width_limit=peak.width_limit * scale, height=peak.height / jac,
                    height_limit=peak.height_limit / jac, extra=extra or None)
@@ -181,9 +191,16 @@ def _range_to_energy(rng: tuple, k: float) -> tuple:
 
 
 def config_to_energy(cfg: FitConfig, unit: str, reference_nm: float) -> FitConfig:
-    """Convert peaks, fit window and down-weighted ranges of ``cfg`` from nm to ``unit``."""
+    """Convert peaks, fit window and down-weighted ranges of ``cfg`` from nm to ``unit``.
+
+    The fitting order is fixed in the input space (``cfg.fit_peaks()``, i.e. by
+    wavelength when ``sort_peaks_by_pos``) and kept (``sort_peaks_by_pos=False``
+    in the result), so stage ``active`` indices and result columns refer to
+    the same peaks as in nm.
+    """
     k = energy_constant(unit)
-    return replace(cfg, peaks=tuple(peak_to_energy(p, unit, reference_nm) for p in cfg.peaks),
+    return replace(cfg, peaks=tuple(peak_to_energy(p, unit, reference_nm) for p in cfg.fit_peaks()),
+                   sort_peaks_by_pos=False,
                    x_fit_range=None if cfg.x_fit_range is None else _range_to_energy(cfg.x_fit_range, k),
                    downweight_x_ranges=None if not cfg.downweight_x_ranges else
                    tuple(_range_to_energy(r, k) for r in cfg.downweight_x_ranges))

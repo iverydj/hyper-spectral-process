@@ -70,6 +70,25 @@ def test_whitaker_hayes_keeps_sharp_strong_band_top():
     assert np.flatnonzero(mask).tolist() == [60]
 
 
+@pytest.mark.parametrize("bump", [(80.0, 20.0), (20.0, 80.0), (100.0, 30.0)])
+def test_whitaker_hayes_two_sample_spike_shapes(bump):
+    y = 20 + np.random.default_rng(5).normal(0, 1.0, 300)
+    y[100:102] += bump
+    mask = whitaker_hayes_mask(y[None, :], threshold=7.0, max_width=2)[0]
+    assert np.flatnonzero(mask).tolist() == [100, 101]
+
+
+def test_simple_despike_keeps_clean_neighbours():
+    y = np.full(12, 20.0)
+    y[1] = 21.0
+    y[2] = 90.0
+    out = despike_simple(one(y), 30.0).spectra[0]
+    assert out[1] == 21.0 and out[2] == pytest.approx(20.5)
+    z = np.full(12, 20.0)
+    z[1] = 90.0                                   # a spike on the second sample is removed too
+    assert despike_simple(one(z), 30.0).spectra[0, 1] == pytest.approx(20.0)
+
+
 def test_whitaker_hayes_protect_and_zero_mad():
     x, y = noisy_band()
     y[100] += 80.0
@@ -121,6 +140,9 @@ def test_peak_height_refine():
     y = gauss(x, 5.03, 2.0)
     assert peak_height(x, y, (4, 6), refine=2) == pytest.approx(1.0, abs=2e-4)
     assert peak_height(x, y, (4, 6), refine=0) < 1.0
+    xs = np.arange(101.0)
+    slope = 1 - (xs - 200) ** 2 / 1e5                           # no peak top inside the window
+    assert peak_height(xs, slope, (40, 60), refine=2) == pytest.approx(slope[60])
 
 
 # --------------------------------------------------------------- baseline
@@ -171,6 +193,7 @@ def test_interpolation_axis_rule():
     ax = interpolation_axis(np.array([139.9, 200.3]), 2.0)
     assert ax[0] == 140.0 and ax[-1] == 200.0
     assert interpolation_axis(np.array([140.0, 150.0]), 1.0)[0] == 141.0   # strictly greater than the minimum
+    assert interpolation_axis(np.array([0.5, 1000.3]), 0.1)[-1] == pytest.approx(1000.3)   # no rounding loss
     m = one(np.linspace(0, 1, 50)[None, :] * 2, np.linspace(10.5, 59.5, 50))
     out = interpolate(m, 0.5)
     np.testing.assert_allclose(out.spectra[0], (out.axis - 10.5) / 49.0 * 2, atol=1e-12)

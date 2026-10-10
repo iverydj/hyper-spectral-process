@@ -26,8 +26,9 @@ def peak_height(axis: np.ndarray, y: np.ndarray, window: tuple[float, float], re
     ``refine = k > 0`` fits a parabola through the maximum and its ``k``
     neighbours on each side and returns the vertex value, which keeps
     single-sample noise out of the scale factor. If the maximum is closer than
-    ``k`` samples to the spectrum edge, or the parabola is not concave, the
-    sample maximum is returned.
+    ``k`` samples to the spectrum edge, the parabola is not concave, or its
+    vertex lies outside the fitted samples (the window does not contain a
+    peak top), the sample maximum is returned.
     """
     inside = (axis >= float(window[0])) & (axis <= float(window[1]))
     if not inside.any():
@@ -42,6 +43,8 @@ def peak_height(axis: np.ndarray, y: np.ndarray, window: tuple[float, float], re
     if c[0] >= 0:
         return float(y[k])
     vertex = -c[1] / (2.0 * c[0])
+    if not axis[k - refine] - axis[k] <= vertex <= axis[k + refine] - axis[k]:
+        return float(y[k])
     return float(np.polyval(c, vertex))
 
 

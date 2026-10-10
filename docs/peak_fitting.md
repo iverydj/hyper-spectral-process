@@ -30,7 +30,7 @@ data units.
 | `gaussian` | `exp(-4 ln2 d^2 / w^2)` | FWHM | | pos, width, height |
 | `lorentzian` | `1 / (1 + 4 d^2 / w^2)` | FWHM | | pos, width, height |
 | `pseudovoigt_fixed` | `eta L(d; w) + (1 - eta) G(d; w)` | FWHM (shared) | `eta` (fixed, required) | pos, width, height |
-| `pseudovoigt` | Thompson-Cox-Hastings: `eta L(d; F) + (1 - eta) G(d; F)` | Lorentzian FWHM `Gamma_L` | `width_g` = Gaussian FWHM `Gamma_G` | pos, width, width_g, height |
+| `pseudovoigt` | Thompson-Cox-Hastings: `eta_h L(d; F) + (1 - eta_h) G(d; F)` (see below) | Lorentzian FWHM `Gamma_L` | `width_g` = Gaussian FWHM `Gamma_G` | pos, width, width_g, height |
 | `fano` | `(q gamma + d)^2 / ((q^2 + 1)(gamma^2 + d^2))`, `gamma = w/2` | resonance FWHM | `q` (asymmetry), hard range `q_range` | pos, width, q, height |
 
 For the TCH pseudo-Voigt (P. Thompson, D. E. Cox and J. B. Hastings,
@@ -40,9 +40,16 @@ from the two widths (`tch_fwhm_eta`):
     F^5 = G^5 + 2.69269 G^4 L + 2.42843 G^3 L^2 + 4.47163 G^2 L^3 + 0.07842 G L^4 + L^5
     eta = 1.36603 r - 0.47719 r^2 + 0.11116 r^3,   r = L / F,
 
-which approximates the Voigt profile within about 1 % (checked against
-`scipy.special.voigt_profile` in the tests). `Gamma_G -> 0` gives a
-Lorentzian, `Gamma_L -> 0` a Gaussian.
+Here `eta` is the Lorentzian fraction of the **area**: the Voigt profile is
+approximated by `eta L_a + (1 - eta) G_a` with unit-area components of FWHM
+`F`. Scaled to unit height the profile is `eta_h L + (1 - eta_h) G` with the
+height fraction `eta_h = (eta / C_L) / (eta / C_L + (1 - eta) / C_G)`
+(`C_G = 1.0645`, `C_L = pi/2`, the areas per unit FWHM of unit-height
+components). It agrees with the Voigt profile within about 1 % of the peak
+height, and fitting it to a Voigt profile returns `Gamma_L` and `Gamma_G`
+within 1 % (both checked against `scipy.special.voigt_profile` in the tests).
+`Gamma_G -> 0` gives a Lorentzian, `Gamma_L -> 0` a Gaussian. The stored
+`eta` of a TCH peak is the area fraction `eta`.
 
 The Breit-Wigner-Fano profile has its maximum (value 1) at `pos + w / (2q)`,
 not at `pos`, and a zero at `pos - q w / 2`; far from the resonance it tends
@@ -51,10 +58,11 @@ Lorentzian; the sign of `q` sets the side of the long tail. Keep `q_range`
 on one sign to stop the fit from flipping the asymmetry.
 
 Derived quantities (`peak_area`, `peak_fwhm`; `FitSpectrumMap.peak_areas()`,
-`.peak_fwhms()`): the area is the analytic integral `height * FWHM *
-((1 - eta) * 1.0645 + eta * 1.5708)` (with the TCH FWHM and eta for
-`pseudovoigt`) and NaN for `fano`; the profile FWHM is `width`, the TCH `F`,
-or for Fano `w (1 + p^2) / |1 - p^2|` with `p = 1/q` (infinite for `|q| <= 1`).
+`.peak_fwhms()`): the area is the analytic integral, `height * FWHM *
+((1 - eta) * 1.0645 + eta * 1.5708)` for Gaussian, Lorentzian and fixed-eta
+peaks, `height * F / (eta / C_L + (1 - eta) / C_G)` for `pseudovoigt`, NaN
+for `fano`; the profile FWHM is `width`, the TCH `F`, or for Fano
+`w (1 + p^2) / |1 - p^2|` with `p = 1/q` (infinite for `|q| <= 1`).
 
 ## Peak specification
 
@@ -137,7 +145,9 @@ variation; use `reg = 0` for parameters whose spatial variation is the result.
 order; every stage creates a new Adam optimiser with its learning rate
 (panel c above). `active` (peak indices in fitting order) restricts the model
 to some peaks in that stage, e.g. main peaks first and shoulders later;
-inactive peaks contribute nothing and are not moved by the data. With
+inactive peaks contribute nothing to the model and are not moved by the data
+(the spring prior and the negative-height penalty still act on them, which
+moves them only if they are away from their anchors or negative). With
 `recenter_reg` the spring anchors are set to the current values when the
 stage starts, so the prior pulls towards the previous stage's result instead
 of the initial guess (the loss drops at the stage boundary in panel c for this
@@ -190,8 +200,11 @@ Preparation (`prepare_map`), in order:
    `(lambda / lambda_ref)^2` (`lambda_ref` = centre of the wavelength fit
    window, so intensities keep their scale) and converts the peaks given in
    nm (positions exactly, widths and limits by `|dE/d lambda|` at the peak,
-   heights by the Jacobian), the fit window and the down-weighted ranges. The
-   result is stored on the energy axis. Lineshapes such as a Lorentzian
+   heights by the Jacobian, the Fano asymmetry mirrored, `q -> -q`, because
+   the axis direction reverses), the fit window and the down-weighted ranges.
+   The fitting order stays the order by wavelength, so stage `active`
+   indices and result columns mean the same peaks as in nm. The result is
+   stored on the energy axis. Lineshapes such as a Lorentzian
    exciton band are defined per unit energy, which is why the Jacobian
    matters for broad photoluminescence bands.
 4. **Normalisation** (`normalize_01`, default on): each row is mapped to

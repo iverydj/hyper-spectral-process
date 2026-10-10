@@ -54,7 +54,7 @@ The result of `fit_map` (and of `composite_fit`); schema `FitSpectrumMap.v4`.
 | `spectra_original` | `spectra_original` | `(N, L)` | the data that were fitted (normalised unless un-normalised) |
 | `peak_types` | `peak_types` | `(P,)` | canonical type of every peak |
 | `params_pos`, `params_width`, `params_height` | `pos`, `width`, `height` | `(N, P)` | position, width (meaning per type, see [peak fitting](peak_fitting.md#lineshapes)), height |
-| `params_eta` | `eta` | `(N, P)` | 0 Gaussian, 1 Lorentzian, fixed eta, TCH eta, 0 for Fano |
+| `params_eta` | `eta` | `(N, P)` | 0 Gaussian, 1 Lorentzian, the fixed eta (height fraction), the TCH eta (area fraction), 0 for Fano |
 | `params_width_g`, `params_q` | `width_g`, `q` | `(N, P)` or empty | TCH Gaussian FWHM, Fano asymmetry (0 for other types) |
 | `params_base` | `base` | `(N,)` | constant baseline |
 | `recon` | `recon` | `(N, L)` | reconstruction on the window |
